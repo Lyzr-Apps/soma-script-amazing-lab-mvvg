@@ -1,0 +1,26 @@
+{
+  "agent_name": "SOMA Book Outline Generator",
+  "agent_id": "699dc06311babb6bd9bda5c9",
+  "description": "Expert book outline architect that generates comprehensive, well-structured book outlines from a single prompt, including chapter titles, summaries, themes, target audience analysis, and suggested page counts.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "book_title": "string",
+    "subtitle": "string",
+    "target_audience": "string",
+    "synopsis": "string",
+    "estimated_pages": "string",
+    "themes": "string",
+    "chapters": "string"
+  },
+  "example_response": {
+    "book_title": "The Art of Resilient Living",
+    "subtitle": "A Practical Guide to Thriving Through Life's Challenges",
+    "target_audience": "Adults aged 25-55 seeking personal development and emotional resilience strategies",
+    "synopsis": "A comprehensive guide exploring the science and practice of building resilience...",
+    "estimated_pages": "280",
+    "themes": "Resilience, personal growth, mental health, adaptability, mindfulness",
+    "chapters": "Chapter 1: Understanding Resilience - An introduction to what resilience means... Chapter 2: The Science of Bouncing Back - Exploring the psychological research..."
+  }
+}

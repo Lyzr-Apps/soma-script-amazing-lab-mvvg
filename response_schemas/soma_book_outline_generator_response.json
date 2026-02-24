@@ -1,0 +1,26 @@
+{
+  "agent_name": "SOMA Book Outline Generator",
+  "agent_id": "699dc06311babb6bd9bda5c9",
+  "description": "Expert book outline architect that generates comprehensive, well-structured book outlines from a single prompt, including chapter titles, summaries, themes, target audience analysis, and suggested page counts.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "book_title": "string",
+    "subtitle": "string",
+    "target_audience": "string",
+    "synopsis": "string",
+    "estimated_pages": "string",
+    "themes": "string",
+    "chapters": "string"
+  },
+  "example_response": {
+    "book_title": "sample string",
+    "subtitle": "sample string",
+    "target_audience": "sample string",
+    "synopsis": "sample string",
+    "estimated_pages": "sample string",
+    "themes": "sample string",
+    "chapters": "sample string"
+  }
+}

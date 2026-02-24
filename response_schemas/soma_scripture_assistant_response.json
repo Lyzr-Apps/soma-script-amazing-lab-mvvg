@@ -1,0 +1,26 @@
+{
+  "agent_name": "SOMA Scripture Assistant",
+  "agent_id": "699dc064d6de05974a3c6c6f",
+  "description": "Faith-based writing assistant and scripture reference expert that helps writers find, verify, and contextually integrate Bible references and spiritual content into their manuscripts accurately and meaningfully.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "primary_verse": "string",
+    "verse_text": "string",
+    "translation": "string",
+    "context_explanation": "string",
+    "related_verses": "string",
+    "integration_suggestion": "string",
+    "devotional_application": "string"
+  },
+  "example_response": {
+    "primary_verse": "sample string",
+    "verse_text": "sample string",
+    "translation": "sample string",
+    "context_explanation": "sample string",
+    "related_verses": "sample string",
+    "integration_suggestion": "sample string",
+    "devotional_application": "sample string"
+  }
+}

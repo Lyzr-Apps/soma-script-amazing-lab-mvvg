@@ -1,0 +1,24 @@
+{
+  "agent_name": "SOMA Manuscript Editor",
+  "agent_id": "699dc0642324bf32f83b5d61",
+  "description": "Professional manuscript editor and proofreader that reviews and edits manuscript text for grammar, style, clarity, pacing, and consistency, providing detailed editorial feedback and polished revised versions.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "edited_text": "string",
+    "changes_summary": "string",
+    "quality_before": "string",
+    "quality_after": "string",
+    "editorial_notes": "string",
+    "pacing_feedback": "string"
+  },
+  "example_response": {
+    "edited_text": "sample string",
+    "changes_summary": "sample string",
+    "quality_before": "sample string",
+    "quality_after": "sample string",
+    "editorial_notes": "sample string",
+    "pacing_feedback": "sample string"
+  }
+}

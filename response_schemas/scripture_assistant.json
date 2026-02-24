@@ -1,0 +1,26 @@
+{
+  "agent_name": "SOMA Scripture Assistant",
+  "agent_id": "699dc064d6de05974a3c6c6f",
+  "description": "Faith-based writing assistant and scripture reference expert that helps writers find, verify, and contextually integrate Bible references and spiritual content into their manuscripts accurately and meaningfully.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "primary_verse": "string",
+    "verse_text": "string",
+    "translation": "string",
+    "context_explanation": "string",
+    "related_verses": "string",
+    "integration_suggestion": "string",
+    "devotional_application": "string"
+  },
+  "example_response": {
+    "primary_verse": "Jeremiah 29:11",
+    "verse_text": "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you, plans to give you hope and a future.",
+    "translation": "NIV",
+    "context_explanation": "Written by the prophet Jeremiah to the Jewish exiles in Babylon, this verse is part of a letter encouraging them to settle in and trust God's long-term plan despite their current suffering.",
+    "related_verses": "Romans 8:28 - All things work together for good; Proverbs 3:5-6 - Trust in the Lord with all your heart; Isaiah 55:8-9 - God's ways are higher than our ways",
+    "integration_suggestion": "This verse works well as an anchor for chapters on hope, divine purpose, or overcoming adversity. Consider placing it at the opening of a chapter about finding direction after loss.",
+    "devotional_application": "Reflect on a time when circumstances seemed hopeless but eventually led to growth. Journal about areas where you need to trust God's plan over your own understanding."
+  }
+}

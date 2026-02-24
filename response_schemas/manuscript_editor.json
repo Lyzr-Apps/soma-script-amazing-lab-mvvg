@@ -1,0 +1,24 @@
+{
+  "agent_name": "SOMA Manuscript Editor",
+  "agent_id": "699dc0642324bf32f83b5d61",
+  "description": "Professional manuscript editor and proofreader that reviews and edits manuscript text for grammar, style, clarity, pacing, and consistency, providing detailed editorial feedback and polished revised versions.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "edited_text": "string",
+    "changes_summary": "string",
+    "quality_before": "string",
+    "quality_after": "string",
+    "editorial_notes": "string",
+    "pacing_feedback": "string"
+  },
+  "example_response": {
+    "edited_text": "The morning light filtered through the curtains, casting long shadows across the worn hardwood floor...",
+    "changes_summary": "Corrected 3 grammatical errors, restructured 2 run-on sentences, improved word choice in 5 instances, strengthened the opening paragraph.",
+    "quality_before": "6",
+    "quality_after": "8",
+    "editorial_notes": "The manuscript shows strong storytelling instincts with vivid imagery. Main areas for improvement include tightening dialogue and reducing adverb overuse.",
+    "pacing_feedback": "The opening moves at a good pace but the middle section drags slightly. Consider cutting the exposition in paragraphs 4-6 and moving to the conflict sooner."
+  }
+}

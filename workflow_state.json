@@ -1,0 +1,53 @@
+{
+  "app_name": "SOMA-AI - AI-Powered Book Marketplace & Writing Studio",
+  "agents": [
+    {
+      "agent_id": "699dc06311babb6bd9bda5c9",
+      "name": "SOMA Book Outline Generator",
+      "node_id": "book_outline_agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "agent_type": "json",
+      "capabilities": ["text"],
+      "response_schema_file": "response_schemas/book_outline_generator.json"
+    },
+    {
+      "agent_id": "699dc063c546a47313680796",
+      "name": "SOMA AI Chapter Writer",
+      "node_id": "chapter_writer_agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "temperature": 0.75,
+      "top_p": 0.9,
+      "agent_type": "json",
+      "capabilities": ["text"],
+      "response_schema_file": "response_schemas/chapter_writer.json"
+    },
+    {
+      "agent_id": "699dc0642324bf32f83b5d61",
+      "name": "SOMA Manuscript Editor",
+      "node_id": "manuscript_editor_agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "temperature": 0.4,
+      "top_p": 0.9,
+      "agent_type": "json",
+      "capabilities": ["text"],
+      "response_schema_file": "response_schemas/manuscript_editor.json"
+    },
+    {
+      "agent_id": "699dc064d6de05974a3c6c6f",
+      "name": "SOMA Scripture Assistant",
+      "node_id": "scripture_assistant_agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "temperature": 0.3,
+      "top_p": 0.9,
+      "agent_type": "json",
+      "capabilities": ["text"],
+      "response_schema_file": "response_schemas/scripture_assistant.json"
+    }
+  ]
+}

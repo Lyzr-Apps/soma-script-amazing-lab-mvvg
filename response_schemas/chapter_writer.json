@@ -1,0 +1,22 @@
+{
+  "agent_name": "SOMA AI Chapter Writer",
+  "agent_id": "699dc063c546a47313680796",
+  "description": "Expert AI co-author and chapter writer that adapts to the user's writing style to draft full book chapters based on outline details, producing publication-ready prose with engaging narrative flow.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "chapter_title": "string",
+    "chapter_number": "string",
+    "word_count": "string",
+    "chapter_content": "string",
+    "style_notes": "string"
+  },
+  "example_response": {
+    "chapter_title": "The Dawn of Understanding",
+    "chapter_number": "1",
+    "word_count": "2450",
+    "chapter_content": "The morning light filtered through the curtains, casting long shadows across the worn hardwood floor...",
+    "style_notes": "Written in third-person limited perspective with a literary fiction tone. Emphasis on sensory detail and internal monologue."
+  }
+}

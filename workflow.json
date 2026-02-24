@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    {"id": "input_node", "type": "Input", "label": "User Input", "nodeCategory": "input"},
+    {"id": "book_outline_agent", "type": "Agent", "label": "SOMA Book Outline Generator", "nodeCategory": "agent"},
+    {"id": "chapter_writer_agent", "type": "Agent", "label": "SOMA AI Chapter Writer", "nodeCategory": "agent"},
+    {"id": "manuscript_editor_agent", "type": "Agent", "label": "SOMA Manuscript Editor", "nodeCategory": "agent"},
+    {"id": "scripture_assistant_agent", "type": "Agent", "label": "SOMA Scripture Assistant", "nodeCategory": "agent"},
+    {"id": "output_node", "type": "Output", "label": "Generated Content", "nodeCategory": "end"}
+  ],
+  "edges": [
+    {"source": "input_node", "target": "book_outline_agent"},
+    {"source": "input_node", "target": "chapter_writer_agent"},
+    {"source": "input_node", "target": "manuscript_editor_agent"},
+    {"source": "input_node", "target": "scripture_assistant_agent"},
+    {"source": "book_outline_agent", "target": "output_node"},
+    {"source": "chapter_writer_agent", "target": "output_node"},
+    {"source": "manuscript_editor_agent", "target": "output_node"},
+    {"source": "scripture_assistant_agent", "target": "output_node"}
+  ]
+}
