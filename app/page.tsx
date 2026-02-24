@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
@@ -39,8 +39,14 @@ import {
   FaRegBookmark,
   FaArrowRight,
   FaCircle,
+  FaCheck,
+  FaDownload,
+  FaHistory,
+  FaClock,
+  FaChartBar,
 } from 'react-icons/fa'
 import { FiLoader, FiInfo, FiAlertCircle } from 'react-icons/fi'
+import { HiOutlineDocumentText } from 'react-icons/hi'
 
 // =====================================================================
 // AGENT IDS
@@ -106,8 +112,33 @@ interface SampleBook {
   genre: string
   price: number
   rating: number
+  pages: number
+  publishDate: string
+  description: string
   gradientFrom: string
   gradientTo: string
+}
+
+interface SessionItem {
+  id: string
+  type: 'outline' | 'chapter' | 'edit' | 'scripture'
+  title: string
+  preview: string
+  timestamp: Date
+  data: any
+}
+
+interface PrefillChapter {
+  title: string
+  number: string
+  summary: string
+}
+
+interface WritingStats {
+  wordsGenerated: number
+  outlinesCreated: number
+  chaptersWritten: number
+  editsPerformed: number
 }
 
 // =====================================================================
@@ -125,12 +156,12 @@ const TRANSLATIONS = ['KJV', 'NIV', 'ESV', 'NASB', 'NLT']
 // SAMPLE DATA
 // =====================================================================
 const SAMPLE_BOOKS: SampleBook[] = [
-  { id: 1, title: 'The Silent Path', author: 'Maria Gonzales', genre: 'Fiction', price: 14.99, rating: 4.5, gradientFrom: 'from-indigo-600', gradientTo: 'to-purple-700' },
-  { id: 2, title: 'Beyond the Stars', author: 'James Chen', genre: 'Sci-Fi', price: 12.99, rating: 4.8, gradientFrom: 'from-blue-600', gradientTo: 'to-cyan-600' },
-  { id: 3, title: 'Walking in Faith', author: 'Sarah Williams', genre: 'Faith/Spiritual', price: 16.99, rating: 4.9, gradientFrom: 'from-amber-500', gradientTo: 'to-orange-600' },
-  { id: 4, title: 'Mind Over Matter', author: 'Dr. Robert Kim', genre: 'Self-Help', price: 19.99, rating: 4.3, gradientFrom: 'from-emerald-500', gradientTo: 'to-teal-600' },
-  { id: 5, title: 'The Last Relic', author: 'T.K. Harrison', genre: 'Fantasy', price: 11.99, rating: 4.7, gradientFrom: 'from-rose-500', gradientTo: 'to-pink-600' },
-  { id: 6, title: 'Crimson Midnight', author: 'Olivia Drake', genre: 'Thriller', price: 13.99, rating: 4.4, gradientFrom: 'from-red-600', gradientTo: 'to-rose-700' },
+  { id: 1, title: 'The Silent Path', author: 'Maria Gonzales', genre: 'Fiction', price: 14.99, rating: 4.5, pages: 342, publishDate: '2025-03-15', description: 'A haunting tale of self-discovery through the quiet landscapes of rural Japan.', gradientFrom: 'from-indigo-600', gradientTo: 'to-purple-700' },
+  { id: 2, title: 'Beyond the Stars', author: 'James Chen', genre: 'Sci-Fi', price: 12.99, rating: 4.8, pages: 418, publishDate: '2025-01-22', description: 'Humanity\'s first contact with an alien civilization challenges everything we know about the universe.', gradientFrom: 'from-blue-600', gradientTo: 'to-cyan-600' },
+  { id: 3, title: 'Walking in Faith', author: 'Sarah Williams', genre: 'Faith/Spiritual', price: 16.99, rating: 4.9, pages: 256, publishDate: '2024-11-08', description: 'A deeply personal exploration of finding purpose through spiritual practice and community.', gradientFrom: 'from-amber-500', gradientTo: 'to-orange-600' },
+  { id: 4, title: 'Mind Over Matter', author: 'Dr. Robert Kim', genre: 'Self-Help', price: 19.99, rating: 4.3, pages: 298, publishDate: '2025-02-14', description: 'Evidence-based strategies for building mental resilience and achieving peak performance.', gradientFrom: 'from-emerald-500', gradientTo: 'to-teal-600' },
+  { id: 5, title: 'The Last Relic', author: 'T.K. Harrison', genre: 'Fantasy', price: 11.99, rating: 4.7, pages: 512, publishDate: '2024-09-30', description: 'An epic quest across three kingdoms to recover an ancient artifact before darkness falls.', gradientFrom: 'from-rose-500', gradientTo: 'to-pink-600' },
+  { id: 6, title: 'Crimson Midnight', author: 'Olivia Drake', genre: 'Thriller', price: 13.99, rating: 4.4, pages: 380, publishDate: '2025-04-01', description: 'A forensic psychologist races against time to stop a killer who strikes at exactly midnight.', gradientFrom: 'from-red-600', gradientTo: 'to-rose-700' },
 ]
 
 const SAMPLE_OUTLINE: OutlineResponse = {
@@ -241,6 +272,42 @@ function parseRelatedVerses(versesStr: string | undefined | null): { reference: 
 }
 
 // =====================================================================
+// DOWNLOAD HELPER
+// =====================================================================
+function downloadAsText(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// =====================================================================
+// TIME AGO HELPER
+// =====================================================================
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+// =====================================================================
+// WORD COUNT HELPER
+// =====================================================================
+function countWords(text: string | undefined | null): number {
+  if (!text) return 0
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+// =====================================================================
 // MARKDOWN RENDERER
 // =====================================================================
 function renderMarkdown(text: string) {
@@ -310,6 +377,50 @@ class ErrorBoundary extends React.Component<
 }
 
 // =====================================================================
+// COPY BUTTON COMPONENT
+// =====================================================================
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* ignore */ }
+      document.body.removeChild(textarea)
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleCopy}
+      className="h-8 text-xs gap-1.5 border-gray-200 hover:bg-gray-50"
+    >
+      {copied ? (
+        <>
+          <FaCheck className="h-3 w-3 text-green-600" />
+          <span className="text-green-600">Copied!</span>
+        </>
+      ) : (
+        <>
+          <FaRegCopy className="h-3 w-3" />
+          {label ?? 'Copy'}
+        </>
+      )}
+    </Button>
+  )
+}
+
+// =====================================================================
 // STAR RATING COMPONENT
 // =====================================================================
 function StarRating({ rating }: { rating: number }) {
@@ -364,20 +475,195 @@ function StatusMessage({ type, message }: { type: 'success' | 'error' | 'info'; 
 }
 
 // =====================================================================
+// FEATURE HIGHLIGHTS SECTION
+// =====================================================================
+function FeatureHighlights() {
+  const features = [
+    {
+      icon: <FaRegLightbulb className="h-6 w-6 text-indigo-600" />,
+      bgColor: 'bg-indigo-100',
+      title: 'Generate Outlines',
+      description: 'Turn a single idea into a full book outline with chapters, themes, and audience analysis.',
+    },
+    {
+      icon: <FaFeatherAlt className="h-6 w-6 text-purple-600" />,
+      bgColor: 'bg-purple-100',
+      title: 'Write Chapters',
+      description: 'AI co-author drafts publication-ready chapters that match your unique writing style.',
+    },
+    {
+      icon: <FaEdit className="h-6 w-6 text-amber-600" />,
+      bgColor: 'bg-amber-100',
+      title: 'Edit & Polish',
+      description: 'Professional manuscript editing with quality scoring, grammar fixes, and pacing feedback.',
+    },
+    {
+      icon: <FaCross className="h-6 w-6 text-emerald-600" />,
+      bgColor: 'bg-emerald-100',
+      title: 'Scripture Integration',
+      description: 'Find, verify, and integrate Bible references with theological context and devotional insights.',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {features.map((feature, i) => (
+        <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300 group">
+          <CardContent className="pt-6 pb-5 text-center">
+            <div className={cn('w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 transition-transform duration-300 group-hover:scale-110', feature.bgColor)}>
+              {feature.icon}
+            </div>
+            <h3 className="font-semibold text-sm text-gray-900 mb-1.5">{feature.title}</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">{feature.description}</p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// =====================================================================
+// WRITING STATS BAR
+// =====================================================================
+function WritingStatsBar({ stats }: { stats: WritingStats }) {
+  const items = [
+    { icon: <HiOutlineDocumentText className="h-4 w-4 text-indigo-600" />, count: stats.wordsGenerated.toLocaleString(), label: 'Words Generated' },
+    { icon: <FaBook className="h-3.5 w-3.5 text-purple-600" />, count: stats.outlinesCreated, label: 'Outlines' },
+    { icon: <FaFeatherAlt className="h-3.5 w-3.5 text-amber-600" />, count: stats.chaptersWritten, label: 'Chapters' },
+    { icon: <FaEdit className="h-3.5 w-3.5 text-emerald-600" />, count: stats.editsPerformed, label: 'Edits' },
+  ]
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="py-3 px-4">
+        <div className="flex items-center gap-2 mb-2">
+          <FaChartBar className="h-3.5 w-3.5 text-gray-500" />
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Session Progress</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <div className="flex-shrink-0">{item.icon}</div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">{item.count}</p>
+                <p className="text-xs text-gray-400">{item.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// =====================================================================
+// SESSION HISTORY PANEL
+// =====================================================================
+function SessionHistoryPanel({
+  sessionHistory,
+  onSelectItem,
+}: {
+  sessionHistory: SessionItem[]
+  onSelectItem: (item: SessionItem) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const displayItems = sessionHistory.slice(0, 10)
+
+  const typeIcons: Record<string, React.ReactNode> = {
+    outline: <FaBook className="h-3 w-3 text-indigo-600" />,
+    chapter: <FaFeatherAlt className="h-3 w-3 text-purple-600" />,
+    edit: <FaEdit className="h-3 w-3 text-amber-600" />,
+    scripture: <FaCross className="h-3 w-3 text-emerald-600" />,
+  }
+
+  const typeLabels: Record<string, string> = {
+    outline: 'Outline',
+    chapter: 'Chapter',
+    edit: 'Edit',
+    scripture: 'Scripture',
+  }
+
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => {
+    setNow(new Date())
+    const interval = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (displayItems.length === 0) return null
+
+  return (
+    <Card className="border-0 shadow-md mt-4">
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm text-gray-700 flex items-center gap-2">
+            <FaHistory className="h-3.5 w-3.5 text-gray-500" />
+            Session History
+            <Badge variant="secondary" className="ml-1 h-5 text-xs">{displayItems.length}</Badge>
+          </CardTitle>
+          {expanded ? <FaChevronDown className="h-3 w-3 text-gray-400" /> : <FaChevronRight className="h-3 w-3 text-gray-400" />}
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent>
+          <ScrollArea className="max-h-64">
+            <div className="space-y-1.5">
+              {displayItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectItem(item)}
+                  className="w-full flex items-start gap-2.5 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                >
+                  <div className="mt-0.5 flex-shrink-0">{typeIcons[item.type] ?? <FaCircle className="h-3 w-3 text-gray-400" />}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gray-800 truncate">{item.title}</p>
+                      <span className="text-xs text-gray-400 flex items-center gap-1 flex-shrink-0">
+                        <FaClock className="h-2.5 w-2.5" />
+                        {now ? timeAgo(item.timestamp) : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{item.preview}</p>
+                    <Badge variant="outline" className="mt-1 text-xs h-4 px-1.5">{typeLabels[item.type] ?? item.type}</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+// =====================================================================
 // BOOK OUTLINE TAB
 // =====================================================================
-function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
+function BookOutlineTab({
+  showSample,
+  activeAgentId,
+  setActiveAgentId,
+  onChapterSelect,
+  onSessionAdd,
+  onStatsUpdate,
+  outlineResult,
+  setOutlineResult,
+}: {
   showSample: boolean
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
+  onChapterSelect: (chapter: PrefillChapter) => void
+  onSessionAdd: (item: SessionItem) => void
+  onStatsUpdate: (type: 'outline', wordCount: number) => void
+  outlineResult: OutlineResponse | null
+  setOutlineResult: (r: OutlineResponse | null) => void
 }) {
   const [formData, setFormData] = useState({ prompt: '', genre: '', audience: '' })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<OutlineResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set())
 
-  const displayData = showSample ? SAMPLE_OUTLINE : result
+  const displayData = showSample ? SAMPLE_OUTLINE : outlineResult
 
   const handleGenerate = useCallback(async () => {
     if (!formData.prompt.trim()) {
@@ -386,13 +672,24 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
     }
     setLoading(true)
     setError(null)
-    setResult(null)
+    setOutlineResult(null)
     setActiveAgentId(AGENT_IDS.BOOK_OUTLINE)
     try {
       const message = `Generate a book outline for: ${formData.prompt}${formData.genre ? `. Genre: ${formData.genre}` : ''}${formData.audience ? `. Target audience: ${formData.audience}` : ''}`
       const res = await callAIAgent(message, AGENT_IDS.BOOK_OUTLINE)
       if (res.success && res?.response?.result) {
-        setResult(res.response.result as OutlineResponse)
+        const data = res.response.result as OutlineResponse
+        setOutlineResult(data)
+        const wordCount = countWords(data.synopsis) + countWords(data.chapters) + countWords(data.themes)
+        onStatsUpdate('outline', wordCount)
+        onSessionAdd({
+          id: Date.now().toString(),
+          type: 'outline',
+          title: data.book_title ?? 'Untitled Outline',
+          preview: (data.synopsis ?? '').slice(0, 80) + '...',
+          timestamp: new Date(),
+          data,
+        })
       } else {
         setError(res?.error ?? res?.response?.message ?? 'Failed to generate outline. Please try again.')
       }
@@ -402,7 +699,7 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
       setLoading(false)
       setActiveAgentId(null)
     }
-  }, [formData, setActiveAgentId])
+  }, [formData, setActiveAgentId, onSessionAdd, onStatsUpdate, setOutlineResult])
 
   const toggleChapter = (idx: number) => {
     setExpandedChapters(prev => {
@@ -415,6 +712,20 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
 
   const themes = displayData ? parseThemes(displayData.themes) : []
   const chapters = displayData ? parseChapters(displayData.chapters) : []
+
+  // Build full outline text for copy/download
+  const buildOutlineText = (): string => {
+    if (!displayData) return ''
+    let text = `${displayData.book_title ?? 'Untitled'}\n`
+    if (displayData.subtitle) text += `${displayData.subtitle}\n`
+    text += '\n'
+    if (displayData.target_audience) text += `Target Audience: ${displayData.target_audience}\n\n`
+    if (displayData.estimated_pages) text += `Estimated Pages: ${displayData.estimated_pages}\n\n`
+    if (displayData.synopsis) text += `Synopsis:\n${displayData.synopsis}\n\n`
+    if (themes.length > 0) text += `Themes:\n${themes.map(t => `- ${t}`).join('\n')}\n\n`
+    if (chapters.length > 0) text += `Chapters:\n${chapters.map((ch, i) => `${i + 1}. ${ch.title}${ch.description ? ' - ' + ch.description : ''}`).join('\n')}\n`
+    return text
+  }
 
   return (
     <div className="space-y-6">
@@ -494,10 +805,26 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
           {/* Title Card */}
           <Card className="border-0 shadow-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
-              <h2 className="text-2xl font-bold">{displayData.book_title ?? 'Untitled'}</h2>
-              {displayData.subtitle && (
-                <p className="text-indigo-100 mt-1 text-lg italic">{displayData.subtitle}</p>
-              )}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">{displayData.book_title ?? 'Untitled'}</h2>
+                  {displayData.subtitle && (
+                    <p className="text-indigo-100 mt-1 text-lg italic">{displayData.subtitle}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <CopyButton text={buildOutlineText()} label="Copy" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAsText(`${(displayData.book_title ?? 'outline').replace(/\s+/g, '_')}_outline.txt`, buildOutlineText())}
+                    className="h-8 text-xs gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <FaDownload className="h-3 w-3" />
+                    Download
+                  </Button>
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {displayData.target_audience && (
                   <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
@@ -519,10 +846,13 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
           {displayData.synopsis && (
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FaBookOpen className="h-4 w-4 text-indigo-600" />
-                  Synopsis
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FaBookOpen className="h-4 w-4 text-indigo-600" />
+                    Synopsis
+                  </CardTitle>
+                  <CopyButton text={displayData.synopsis} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-gray-700 leading-relaxed text-sm">
@@ -564,25 +894,47 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
               </CardHeader>
               <CardContent>
                 <div className="space-y-1">
-                  {chapters.map((ch, i) => (
-                    <div key={i} className="border rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => toggleChapter(i)}
-                        className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{i + 1}</span>
-                          <span className="font-medium text-sm text-gray-900">{ch.title}</span>
-                        </div>
-                        {expandedChapters.has(i) ? <FaChevronDown className="h-3 w-3 text-gray-400" /> : <FaChevronRight className="h-3 w-3 text-gray-400" />}
-                      </button>
-                      {expandedChapters.has(i) && ch.description && (
-                        <div className="px-3 pb-3 pl-13">
-                          <p className="text-sm text-gray-600 ml-10">{ch.description}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                  {chapters.map((ch, i) => {
+                    // Extract chapter number and title for the "Write This Chapter" button
+                    const chTitle = ch.title.replace(/^Chapter\s+\d+:\s*/i, '').trim()
+                    return (
+                      <div key={i} className="border rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => toggleChapter(i)}
+                          className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{i + 1}</span>
+                            <span className="font-medium text-sm text-gray-900">{ch.title}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 gap-1 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onChapterSelect({
+                                  title: chTitle || ch.title,
+                                  number: String(i + 1),
+                                  summary: ch.description,
+                                })
+                              }}
+                            >
+                              <FaArrowRight className="h-2.5 w-2.5" />
+                              <span className="hidden sm:inline">Write This Chapter</span>
+                            </Button>
+                            {expandedChapters.has(i) ? <FaChevronDown className="h-3 w-3 text-gray-400" /> : <FaChevronRight className="h-3 w-3 text-gray-400" />}
+                          </div>
+                        </button>
+                        {expandedChapters.has(i) && ch.description && (
+                          <div className="px-3 pb-3 pl-13">
+                            <p className="text-sm text-gray-600 ml-10">{ch.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -605,19 +957,44 @@ function BookOutlineTab({ showSample, activeAgentId, setActiveAgentId }: {
 // =====================================================================
 // CHAPTER WRITER TAB
 // =====================================================================
-function ChapterWriterTab({ showSample, activeAgentId, setActiveAgentId }: {
+function ChapterWriterTab({
+  showSample,
+  activeAgentId,
+  setActiveAgentId,
+  prefillChapter,
+  onSessionAdd,
+  onStatsUpdate,
+  chapterResult,
+  setChapterResult,
+}: {
   showSample: boolean
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
+  prefillChapter: PrefillChapter | null
+  onSessionAdd: (item: SessionItem) => void
+  onStatsUpdate: (type: 'chapter', wordCount: number) => void
+  chapterResult: ChapterResponse | null
+  setChapterResult: (r: ChapterResponse | null) => void
 }) {
   const [formData, setFormData] = useState({
     chapterTitle: '', chapterNumber: '', summary: '', genre: '', styleNotes: '',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ChapterResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const displayData = showSample ? SAMPLE_CHAPTER : result
+  // Prefill from outline-to-chapter flow
+  useEffect(() => {
+    if (prefillChapter) {
+      setFormData(prev => ({
+        ...prev,
+        chapterTitle: prefillChapter.title,
+        chapterNumber: prefillChapter.number,
+        summary: prefillChapter.summary,
+      }))
+    }
+  }, [prefillChapter])
+
+  const displayData = showSample ? SAMPLE_CHAPTER : chapterResult
 
   const handleWrite = useCallback(async () => {
     if (!formData.summary.trim()) {
@@ -626,13 +1003,24 @@ function ChapterWriterTab({ showSample, activeAgentId, setActiveAgentId }: {
     }
     setLoading(true)
     setError(null)
-    setResult(null)
+    setChapterResult(null)
     setActiveAgentId(AGENT_IDS.CHAPTER_WRITER)
     try {
       const message = `Write a full chapter with the following details:${formData.chapterTitle ? ` Chapter title: "${formData.chapterTitle}".` : ''}${formData.chapterNumber ? ` Chapter number: ${formData.chapterNumber}.` : ''} Brief/summary: ${formData.summary}${formData.genre ? `. Genre: ${formData.genre}` : ''}${formData.styleNotes ? `. Style notes: ${formData.styleNotes}` : ''}`
       const res = await callAIAgent(message, AGENT_IDS.CHAPTER_WRITER)
       if (res.success && res?.response?.result) {
-        setResult(res.response.result as ChapterResponse)
+        const data = res.response.result as ChapterResponse
+        setChapterResult(data)
+        const wordCount = countWords(data.chapter_content)
+        onStatsUpdate('chapter', wordCount)
+        onSessionAdd({
+          id: Date.now().toString(),
+          type: 'chapter',
+          title: data.chapter_title ?? `Chapter ${data.chapter_number ?? ''}`,
+          preview: (data.chapter_content ?? '').slice(0, 80) + '...',
+          timestamp: new Date(),
+          data,
+        })
       } else {
         setError(res?.error ?? res?.response?.message ?? 'Failed to write chapter. Please try again.')
       }
@@ -642,7 +1030,18 @@ function ChapterWriterTab({ showSample, activeAgentId, setActiveAgentId }: {
       setLoading(false)
       setActiveAgentId(null)
     }
-  }, [formData, setActiveAgentId])
+  }, [formData, setActiveAgentId, onSessionAdd, onStatsUpdate, setChapterResult])
+
+  const buildChapterText = (): string => {
+    if (!displayData) return ''
+    let text = ''
+    if (displayData.chapter_number) text += `Chapter ${displayData.chapter_number}: `
+    text += `${displayData.chapter_title ?? 'Untitled Chapter'}\n\n`
+    if (displayData.chapter_content) text += `${displayData.chapter_content}\n\n`
+    if (displayData.style_notes) text += `---\nStyle Notes: ${displayData.style_notes}\n`
+    if (displayData.word_count) text += `Word Count: ${displayData.word_count}\n`
+    return text
+  }
 
   return (
     <div className="space-y-6">
@@ -748,19 +1147,35 @@ function ChapterWriterTab({ showSample, activeAgentId, setActiveAgentId }: {
           {/* Chapter Header */}
           <Card className="border-0 shadow-md overflow-hidden">
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 text-white">
-              <div className="flex items-center gap-3 mb-1">
-                {displayData.chapter_number && (
-                  <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
-                    Chapter {displayData.chapter_number}
-                  </Badge>
-                )}
-                {displayData.word_count && (
-                  <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
-                    {displayData.word_count} words
-                  </Badge>
-                )}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    {displayData.chapter_number && (
+                      <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
+                        Chapter {displayData.chapter_number}
+                      </Badge>
+                    )}
+                    {displayData.word_count && (
+                      <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/30">
+                        {displayData.word_count} words
+                      </Badge>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-bold mt-2">{displayData.chapter_title ?? 'Untitled Chapter'}</h2>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <CopyButton text={displayData.chapter_content ?? ''} label="Copy" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAsText(`chapter_${displayData.chapter_number ?? '0'}_${(displayData.chapter_title ?? 'untitled').replace(/\s+/g, '_')}.txt`, buildChapterText())}
+                    className="h-8 text-xs gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <FaDownload className="h-3 w-3" />
+                    Download
+                  </Button>
+                </div>
               </div>
-              <h2 className="text-xl font-bold mt-2">{displayData.chapter_title ?? 'Untitled Chapter'}</h2>
             </div>
           </Card>
 
@@ -814,18 +1229,29 @@ function ChapterWriterTab({ showSample, activeAgentId, setActiveAgentId }: {
 // =====================================================================
 // MANUSCRIPT EDITOR TAB
 // =====================================================================
-function ManuscriptEditorTab({ showSample, activeAgentId, setActiveAgentId }: {
+function ManuscriptEditorTab({
+  showSample,
+  activeAgentId,
+  setActiveAgentId,
+  onSessionAdd,
+  onStatsUpdate,
+  editorResult,
+  setEditorResult,
+}: {
   showSample: boolean
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
+  onSessionAdd: (item: SessionItem) => void
+  onStatsUpdate: (type: 'edit', wordCount: number) => void
+  editorResult: EditorResponse | null
+  setEditorResult: (r: EditorResponse | null) => void
 }) {
   const [manuscript, setManuscript] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<EditorResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'edited' | 'original'>('edited')
 
-  const displayData = showSample ? SAMPLE_EDITOR : result
+  const displayData = showSample ? SAMPLE_EDITOR : editorResult
 
   const handleEdit = useCallback(async () => {
     if (!manuscript.trim()) {
@@ -834,13 +1260,24 @@ function ManuscriptEditorTab({ showSample, activeAgentId, setActiveAgentId }: {
     }
     setLoading(true)
     setError(null)
-    setResult(null)
+    setEditorResult(null)
     setActiveAgentId(AGENT_IDS.MANUSCRIPT_EDITOR)
     try {
       const message = `Please edit and improve the following manuscript text:\n\n${manuscript}`
       const res = await callAIAgent(message, AGENT_IDS.MANUSCRIPT_EDITOR)
       if (res.success && res?.response?.result) {
-        setResult(res.response.result as EditorResponse)
+        const data = res.response.result as EditorResponse
+        setEditorResult(data)
+        const wordCount = countWords(data.edited_text)
+        onStatsUpdate('edit', wordCount)
+        onSessionAdd({
+          id: Date.now().toString(),
+          type: 'edit',
+          title: 'Manuscript Edit',
+          preview: (data.edited_text ?? '').slice(0, 80) + '...',
+          timestamp: new Date(),
+          data,
+        })
       } else {
         setError(res?.error ?? res?.response?.message ?? 'Failed to edit manuscript. Please try again.')
       }
@@ -850,10 +1287,22 @@ function ManuscriptEditorTab({ showSample, activeAgentId, setActiveAgentId }: {
       setLoading(false)
       setActiveAgentId(null)
     }
-  }, [manuscript, setActiveAgentId])
+  }, [manuscript, setActiveAgentId, onSessionAdd, onStatsUpdate, setEditorResult])
 
   const qualityBefore = displayData ? parseQualityScore(displayData.quality_before) : 0
   const qualityAfter = displayData ? parseQualityScore(displayData.quality_after) : 0
+
+  const buildEditedText = (): string => {
+    if (!displayData) return ''
+    let text = `Edited Manuscript\n${'='.repeat(40)}\n\n`
+    if (displayData.edited_text) text += `${displayData.edited_text}\n\n`
+    text += `---\n`
+    if (displayData.changes_summary) text += `Changes Summary:\n${displayData.changes_summary}\n\n`
+    if (displayData.editorial_notes) text += `Editorial Notes:\n${displayData.editorial_notes}\n\n`
+    if (displayData.pacing_feedback) text += `Pacing Feedback:\n${displayData.pacing_feedback}\n\n`
+    text += `Quality: ${qualityBefore}/10 -> ${qualityAfter}/10\n`
+    return text
+  }
 
   return (
     <div className="space-y-6">
@@ -934,19 +1383,31 @@ function ManuscriptEditorTab({ showSample, activeAgentId, setActiveAgentId }: {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Manuscript Text</CardTitle>
-                <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setViewMode('edited')}
-                    className={cn('px-3 py-1 text-xs font-medium rounded-md transition-colors', viewMode === 'edited' ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700')}
+                <div className="flex items-center gap-2">
+                  <CopyButton text={displayData.edited_text ?? ''} label="Copy Edited" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAsText('edited_manuscript.txt', buildEditedText())}
+                    className="h-8 text-xs gap-1.5"
                   >
-                    Edited
-                  </button>
-                  <button
-                    onClick={() => setViewMode('original')}
-                    className={cn('px-3 py-1 text-xs font-medium rounded-md transition-colors', viewMode === 'original' ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700')}
-                  >
-                    Original
-                  </button>
+                    <FaDownload className="h-3 w-3" />
+                    Download
+                  </Button>
+                  <div className="flex items-center gap-0 bg-gray-100 rounded-lg p-0.5 ml-2">
+                    <button
+                      onClick={() => setViewMode('edited')}
+                      className={cn('px-3 py-1 text-xs font-medium rounded-md transition-colors', viewMode === 'edited' ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700')}
+                    >
+                      Edited
+                    </button>
+                    <button
+                      onClick={() => setViewMode('original')}
+                      className={cn('px-3 py-1 text-xs font-medium rounded-md transition-colors', viewMode === 'original' ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700')}
+                    >
+                      Original
+                    </button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -1037,17 +1498,26 @@ function ManuscriptEditorTab({ showSample, activeAgentId, setActiveAgentId }: {
 // =====================================================================
 // SCRIPTURE ASSISTANT TAB
 // =====================================================================
-function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: {
+function ScriptureAssistantTab({
+  showSample,
+  activeAgentId,
+  setActiveAgentId,
+  onSessionAdd,
+  scriptureResult,
+  setScriptureResult,
+}: {
   showSample: boolean
   activeAgentId: string | null
   setActiveAgentId: (id: string | null) => void
+  onSessionAdd: (item: SessionItem) => void
+  scriptureResult: ScriptureResponse | null
+  setScriptureResult: (r: ScriptureResponse | null) => void
 }) {
   const [formData, setFormData] = useState({ topic: '', context: '', translation: '' })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ScriptureResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const displayData = showSample ? SAMPLE_SCRIPTURE : result
+  const displayData = showSample ? SAMPLE_SCRIPTURE : scriptureResult
 
   const handleSearch = useCallback(async () => {
     if (!formData.topic.trim()) {
@@ -1056,13 +1526,22 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
     }
     setLoading(true)
     setError(null)
-    setResult(null)
+    setScriptureResult(null)
     setActiveAgentId(AGENT_IDS.SCRIPTURE_ASSISTANT)
     try {
       const message = `Find scripture references for the topic: "${formData.topic}"${formData.context ? `. Context/purpose: ${formData.context}` : ''}${formData.translation ? `. Preferred translation: ${formData.translation}` : ''}`
       const res = await callAIAgent(message, AGENT_IDS.SCRIPTURE_ASSISTANT)
       if (res.success && res?.response?.result) {
-        setResult(res.response.result as ScriptureResponse)
+        const data = res.response.result as ScriptureResponse
+        setScriptureResult(data)
+        onSessionAdd({
+          id: Date.now().toString(),
+          type: 'scripture',
+          title: data.primary_verse ?? 'Scripture Search',
+          preview: (data.verse_text ?? '').slice(0, 80) + '...',
+          timestamp: new Date(),
+          data,
+        })
       } else {
         setError(res?.error ?? res?.response?.message ?? 'Failed to search scriptures. Please try again.')
       }
@@ -1072,9 +1551,28 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
       setLoading(false)
       setActiveAgentId(null)
     }
-  }, [formData, setActiveAgentId])
+  }, [formData, setActiveAgentId, onSessionAdd, setScriptureResult])
 
   const relatedVerses = displayData ? parseRelatedVerses(displayData.related_verses) : []
+
+  const buildScriptureText = (): string => {
+    if (!displayData) return ''
+    let text = `${displayData.primary_verse ?? 'Verse'}`
+    if (displayData.translation) text += ` (${displayData.translation})`
+    text += '\n\n'
+    if (displayData.verse_text) text += `"${displayData.verse_text}"\n\n`
+    if (displayData.context_explanation) text += `Context:\n${displayData.context_explanation}\n\n`
+    if (relatedVerses.length > 0) {
+      text += 'Related Verses:\n'
+      relatedVerses.forEach(v => {
+        text += `- ${v.reference}${v.text ? ': ' + v.text : ''}\n`
+      })
+      text += '\n'
+    }
+    if (displayData.integration_suggestion) text += `Integration Suggestion:\n${displayData.integration_suggestion}\n\n`
+    if (displayData.devotional_application) text += `Devotional Application:\n${displayData.devotional_application}\n`
+    return text
+  }
 
   return (
     <div className="space-y-6">
@@ -1152,13 +1650,16 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
           {/* Primary Verse Card */}
           <Card className="border-0 shadow-lg overflow-hidden">
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-6 border-b border-amber-100">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-bold text-amber-900">{displayData.primary_verse ?? 'Verse'}</h2>
-                {displayData.translation && (
-                  <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">
-                    {displayData.translation}
-                  </Badge>
-                )}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-amber-900">{displayData.primary_verse ?? 'Verse'}</h2>
+                  {displayData.translation && (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">
+                      {displayData.translation}
+                    </Badge>
+                  )}
+                </div>
+                <CopyButton text={buildScriptureText()} label="Copy All" />
               </div>
               {displayData.verse_text && (
                 <div className="relative pl-6 border-l-4 border-amber-400">
@@ -1166,6 +1667,9 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
                   <p className="text-gray-800 text-lg italic leading-relaxed font-serif">
                     {displayData.verse_text}
                   </p>
+                  <div className="mt-2">
+                    <CopyButton text={`${displayData.primary_verse ?? ''} - "${displayData.verse_text}" (${displayData.translation ?? ''})`} label="Copy Verse" />
+                  </div>
                 </div>
               )}
             </div>
@@ -1175,10 +1679,13 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
           {displayData.context_explanation && (
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FaBookOpen className="h-4 w-4 text-indigo-600" />
-                  Context & Explanation
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FaBookOpen className="h-4 w-4 text-indigo-600" />
+                    Context & Explanation
+                  </CardTitle>
+                  <CopyButton text={displayData.context_explanation} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-gray-700 leading-relaxed">
@@ -1202,10 +1709,11 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
                   {relatedVerses.map((v, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                       <FaCircle className="h-2 w-2 text-indigo-400 mt-1.5 flex-shrink-0" />
-                      <div>
+                      <div className="flex-1">
                         <span className="font-semibold text-sm text-indigo-700">{v.reference}</span>
                         {v.text && <p className="text-sm text-gray-600 mt-0.5 italic">{v.text}</p>}
                       </div>
+                      <CopyButton text={`${v.reference}${v.text ? ' - ' + v.text : ''}`} label="" />
                     </div>
                   ))}
                 </div>
@@ -1217,10 +1725,13 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
           {displayData.integration_suggestion && (
             <Card className="border-0 shadow-md border-l-4 border-l-indigo-400">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-indigo-700">
-                  <FaRegLightbulb className="h-4 w-4" />
-                  Integration Suggestion
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2 text-indigo-700">
+                    <FaRegLightbulb className="h-4 w-4" />
+                    Integration Suggestion
+                  </CardTitle>
+                  <CopyButton text={displayData.integration_suggestion} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-gray-700">
@@ -1234,10 +1745,13 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
           {displayData.devotional_application && (
             <Card className="border-0 shadow-md bg-purple-50/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-purple-700">
-                  <FaCross className="h-4 w-4" />
-                  Devotional Application
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2 text-purple-700">
+                    <FaCross className="h-4 w-4" />
+                    Devotional Application
+                  </CardTitle>
+                  <CopyButton text={displayData.devotional_application} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-purple-900 leading-relaxed">
@@ -1264,9 +1778,11 @@ function ScriptureAssistantTab({ showSample, activeAgentId, setActiveAgentId }: 
 // =====================================================================
 // MARKETPLACE SECTION
 // =====================================================================
-function MarketplaceSection() {
+function MarketplaceSection({ cartCount, setCartCount }: { cartCount: number; setCartCount: (fn: (prev: number) => number) => void }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeGenre, setActiveGenre] = useState<string | null>(null)
+  const [addedBookId, setAddedBookId] = useState<number | null>(null)
+  const [previewBookId, setPreviewBookId] = useState<number | null>(null)
 
   const genres = ['All', 'Fiction', 'Sci-Fi', 'Fantasy', 'Thriller', 'Self-Help', 'Faith/Spiritual']
 
@@ -1275,6 +1791,12 @@ function MarketplaceSection() {
     const matchesGenre = !activeGenre || activeGenre === 'All' || book.genre === activeGenre
     return matchesSearch && matchesGenre
   })
+
+  const handleAddToCart = (bookId: number) => {
+    setCartCount((prev: number) => prev + 1)
+    setAddedBookId(bookId)
+    setTimeout(() => setAddedBookId(null), 2000)
+  }
 
   return (
     <div className="space-y-6">
@@ -1330,17 +1852,56 @@ function MarketplaceSection() {
                 </div>
                 <span className="text-lg font-bold text-indigo-600">${book.price.toFixed(2)}</span>
               </div>
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-2">{book.description}</p>
+              <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                <span className="flex items-center gap-1"><FaFileAlt className="h-2.5 w-2.5" />{book.pages} pages</span>
+                <span className="flex items-center gap-1"><FaClock className="h-2.5 w-2.5" />{book.publishDate}</span>
+              </div>
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center gap-1">
                   <StarRating rating={book.rating} />
                   <span className="text-xs text-gray-500 ml-1">{book.rating}</span>
                 </div>
-                <Button size="sm" variant="outline" className="h-8 text-xs border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
-                  <FaShoppingCart className="mr-1.5 h-3 w-3" />
-                  Add to Cart
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs text-gray-500 hover:text-indigo-600"
+                    onClick={() => setPreviewBookId(previewBookId === book.id ? null : book.id)}
+                  >
+                    <FaBookOpen className="mr-1 h-3 w-3" />
+                    Preview
+                  </Button>
+                  {addedBookId === book.id ? (
+                    <Button size="sm" variant="outline" className="h-8 text-xs border-green-200 text-green-600 bg-green-50" disabled>
+                      <FaCheck className="mr-1.5 h-3 w-3" />
+                      Added
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+                      onClick={() => handleAddToCart(book.id)}
+                    >
+                      <FaShoppingCart className="mr-1.5 h-3 w-3" />
+                      Add to Cart
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
+            {/* Preview Panel */}
+            {previewBookId === book.id && (
+              <div className="border-t bg-gray-50 p-4">
+                <p className="text-sm text-gray-700 leading-relaxed">{book.description}</p>
+                <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                  <span><strong>Genre:</strong> {book.genre}</span>
+                  <span><strong>Pages:</strong> {book.pages}</span>
+                  <span><strong>Published:</strong> {book.publishDate}</span>
+                </div>
+              </div>
+            )}
           </Card>
         ))}
       </div>
@@ -1388,6 +1949,62 @@ function AgentStatusPanel({ activeAgentId }: { activeAgentId: string | null }) {
 export default function Page() {
   const [showSample, setShowSample] = useState(false)
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('outline')
+  const [prefillChapter, setPrefillChapter] = useState<PrefillChapter | null>(null)
+  const [cartCount, setCartCount] = useState(0)
+  const [sessionHistory, setSessionHistory] = useState<SessionItem[]>([])
+  const [writingStats, setWritingStats] = useState<WritingStats>({
+    wordsGenerated: 0,
+    outlinesCreated: 0,
+    chaptersWritten: 0,
+    editsPerformed: 0,
+  })
+
+  // Lifted result states so session history can reload them
+  const [outlineResult, setOutlineResult] = useState<OutlineResponse | null>(null)
+  const [chapterResult, setChapterResult] = useState<ChapterResponse | null>(null)
+  const [editorResult, setEditorResult] = useState<EditorResponse | null>(null)
+  const [scriptureResult, setScriptureResult] = useState<ScriptureResponse | null>(null)
+
+  const handleChapterSelect = useCallback((chapter: PrefillChapter) => {
+    setPrefillChapter(chapter)
+    setActiveTab('writer')
+  }, [])
+
+  const handleSessionAdd = useCallback((item: SessionItem) => {
+    setSessionHistory(prev => [item, ...prev].slice(0, 20))
+  }, [])
+
+  const handleStatsUpdate = useCallback((type: 'outline' | 'chapter' | 'edit', wordCount: number) => {
+    setWritingStats(prev => {
+      const next = { ...prev, wordsGenerated: prev.wordsGenerated + wordCount }
+      if (type === 'outline') next.outlinesCreated = prev.outlinesCreated + 1
+      if (type === 'chapter') next.chaptersWritten = prev.chaptersWritten + 1
+      if (type === 'edit') next.editsPerformed = prev.editsPerformed + 1
+      return next
+    })
+  }, [])
+
+  const handleSelectHistoryItem = useCallback((item: SessionItem) => {
+    switch (item.type) {
+      case 'outline':
+        setOutlineResult(item.data as OutlineResponse)
+        setActiveTab('outline')
+        break
+      case 'chapter':
+        setChapterResult(item.data as ChapterResponse)
+        setActiveTab('writer')
+        break
+      case 'edit':
+        setEditorResult(item.data as EditorResponse)
+        setActiveTab('editor')
+        break
+      case 'scripture':
+        setScriptureResult(item.data as ScriptureResponse)
+        setActiveTab('scripture')
+        break
+    }
+  }, [])
 
   return (
     <ErrorBoundary>
@@ -1405,13 +2022,22 @@ export default function Page() {
                 </div>
                 <p className="text-indigo-200 text-sm sm:text-base max-w-lg">AI-Powered Book Marketplace & Writing Studio -- Create, edit, and publish with intelligent writing assistants.</p>
               </div>
-              <div className="flex items-center gap-3 bg-white/10 rounded-lg px-4 py-2.5 backdrop-blur-sm border border-white/10">
-                <Label htmlFor="sample-toggle" className="text-sm text-indigo-200 cursor-pointer">Sample Data</Label>
-                <Switch
-                  id="sample-toggle"
-                  checked={showSample}
-                  onCheckedChange={setShowSample}
-                />
+              <div className="flex items-center gap-4">
+                {/* Cart Counter */}
+                {cartCount > 0 && (
+                  <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 backdrop-blur-sm border border-white/10">
+                    <FaShoppingCart className="h-4 w-4 text-indigo-300" />
+                    <Badge className="bg-indigo-500 text-white border-0 text-xs h-5 min-w-[20px] flex items-center justify-center">{cartCount}</Badge>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 bg-white/10 rounded-lg px-4 py-2.5 backdrop-blur-sm border border-white/10">
+                  <Label htmlFor="sample-toggle" className="text-sm text-indigo-200 cursor-pointer">Sample Data</Label>
+                  <Switch
+                    id="sample-toggle"
+                    checked={showSample}
+                    onCheckedChange={setShowSample}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1419,7 +2045,17 @@ export default function Page() {
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <Tabs defaultValue="outline" className="space-y-6">
+          {/* Feature Highlights */}
+          <div className="mb-6">
+            <FeatureHighlights />
+          </div>
+
+          {/* Writing Stats Bar */}
+          <div className="mb-6">
+            <WritingStatsBar stats={writingStats} />
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             {/* Tab Navigation */}
             <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto gap-1 bg-white shadow-sm border p-1 rounded-xl">
               <TabsTrigger value="outline" className="flex items-center gap-2 text-xs sm:text-sm py-2.5 rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md">
@@ -1441,6 +2077,7 @@ export default function Page() {
               <TabsTrigger value="marketplace" className="flex items-center gap-2 text-xs sm:text-sm py-2.5 rounded-lg col-span-2 md:col-span-1 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md">
                 <FaShoppingCart className="h-3.5 w-3.5" />
                 Marketplace
+                {cartCount > 0 && <Badge className="bg-indigo-500 text-white border-0 text-xs h-4 min-w-[16px] px-1 flex items-center justify-center ml-1">{cartCount}</Badge>}
               </TabsTrigger>
             </TabsList>
 
@@ -1448,11 +2085,21 @@ export default function Page() {
             <TabsContent value="outline">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3">
-                  <BookOutlineTab showSample={showSample} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId} />
+                  <BookOutlineTab
+                    showSample={showSample}
+                    activeAgentId={activeAgentId}
+                    setActiveAgentId={setActiveAgentId}
+                    onChapterSelect={handleChapterSelect}
+                    onSessionAdd={handleSessionAdd}
+                    onStatsUpdate={handleStatsUpdate}
+                    outlineResult={outlineResult}
+                    setOutlineResult={setOutlineResult}
+                  />
                 </div>
                 <div className="hidden lg:block">
-                  <div className="sticky top-6">
+                  <div className="sticky top-6 space-y-0">
                     <AgentStatusPanel activeAgentId={activeAgentId} />
+                    <SessionHistoryPanel sessionHistory={sessionHistory} onSelectItem={handleSelectHistoryItem} />
                   </div>
                 </div>
               </div>
@@ -1462,11 +2109,21 @@ export default function Page() {
             <TabsContent value="writer">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3">
-                  <ChapterWriterTab showSample={showSample} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId} />
+                  <ChapterWriterTab
+                    showSample={showSample}
+                    activeAgentId={activeAgentId}
+                    setActiveAgentId={setActiveAgentId}
+                    prefillChapter={prefillChapter}
+                    onSessionAdd={handleSessionAdd}
+                    onStatsUpdate={handleStatsUpdate}
+                    chapterResult={chapterResult}
+                    setChapterResult={setChapterResult}
+                  />
                 </div>
                 <div className="hidden lg:block">
-                  <div className="sticky top-6">
+                  <div className="sticky top-6 space-y-0">
                     <AgentStatusPanel activeAgentId={activeAgentId} />
+                    <SessionHistoryPanel sessionHistory={sessionHistory} onSelectItem={handleSelectHistoryItem} />
                   </div>
                 </div>
               </div>
@@ -1476,11 +2133,20 @@ export default function Page() {
             <TabsContent value="editor">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3">
-                  <ManuscriptEditorTab showSample={showSample} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId} />
+                  <ManuscriptEditorTab
+                    showSample={showSample}
+                    activeAgentId={activeAgentId}
+                    setActiveAgentId={setActiveAgentId}
+                    onSessionAdd={handleSessionAdd}
+                    onStatsUpdate={handleStatsUpdate}
+                    editorResult={editorResult}
+                    setEditorResult={setEditorResult}
+                  />
                 </div>
                 <div className="hidden lg:block">
-                  <div className="sticky top-6">
+                  <div className="sticky top-6 space-y-0">
                     <AgentStatusPanel activeAgentId={activeAgentId} />
+                    <SessionHistoryPanel sessionHistory={sessionHistory} onSelectItem={handleSelectHistoryItem} />
                   </div>
                 </div>
               </div>
@@ -1490,11 +2156,19 @@ export default function Page() {
             <TabsContent value="scripture">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3">
-                  <ScriptureAssistantTab showSample={showSample} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId} />
+                  <ScriptureAssistantTab
+                    showSample={showSample}
+                    activeAgentId={activeAgentId}
+                    setActiveAgentId={setActiveAgentId}
+                    onSessionAdd={handleSessionAdd}
+                    scriptureResult={scriptureResult}
+                    setScriptureResult={setScriptureResult}
+                  />
                 </div>
                 <div className="hidden lg:block">
-                  <div className="sticky top-6">
+                  <div className="sticky top-6 space-y-0">
                     <AgentStatusPanel activeAgentId={activeAgentId} />
+                    <SessionHistoryPanel sessionHistory={sessionHistory} onSelectItem={handleSelectHistoryItem} />
                   </div>
                 </div>
               </div>
@@ -1502,26 +2176,61 @@ export default function Page() {
 
             {/* Marketplace Tab */}
             <TabsContent value="marketplace">
-              <MarketplaceSection />
+              <MarketplaceSection cartCount={cartCount} setCartCount={setCartCount} />
             </TabsContent>
           </Tabs>
 
-          {/* Mobile Agent Status */}
-          <div className="lg:hidden mt-6">
+          {/* Mobile Agent Status & Session History */}
+          <div className="lg:hidden mt-6 space-y-4">
             <AgentStatusPanel activeAgentId={activeAgentId} />
+            <SessionHistoryPanel sessionHistory={sessionHistory} onSelectItem={handleSelectHistoryItem} />
           </div>
         </main>
 
         {/* Footer */}
         <footer className="bg-gray-900 text-gray-400 mt-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <FaBookOpen className="h-5 w-5 text-indigo-400" />
-                <span className="font-semibold text-white">SOMA-AI</span>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Brand */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <FaBookOpen className="h-5 w-5 text-indigo-400" />
+                  <span className="font-semibold text-white text-lg">SOMA-AI</span>
+                </div>
+                <p className="text-sm leading-relaxed">AI-Powered Book Marketplace & Writing Studio. Create, edit, and publish with intelligent writing assistants powered by advanced AI.</p>
               </div>
-              <p className="text-sm">AI-Powered Book Marketplace & Writing Studio</p>
+
+              {/* Quick Links */}
+              <div>
+                <h3 className="text-white font-semibold text-sm mb-3">Quick Links</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <button onClick={() => setActiveTab('outline')} className="text-sm hover:text-indigo-400 transition-colors">Writing Studio</button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveTab('marketplace')} className="text-sm hover:text-indigo-400 transition-colors">Marketplace</button>
+                  </li>
+                  <li>
+                    <a href="#" className="text-sm hover:text-indigo-400 transition-colors">About</a>
+                  </li>
+                </ul>
+              </div>
+
+              {/* AI Agents Summary */}
+              <div>
+                <h3 className="text-white font-semibold text-sm mb-3">AI Agents</h3>
+                <div className="space-y-2">
+                  {AGENTS_INFO.map((agent) => (
+                    <div key={agent.id} className="flex items-center gap-2">
+                      <div className={cn('h-2 w-2 rounded-full flex-shrink-0', activeAgentId === agent.id ? 'bg-green-500 animate-pulse' : 'bg-gray-600')} />
+                      <span className="text-xs">{agent.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+            <Separator className="my-6 bg-gray-800" />
+            <p className="text-center text-xs text-gray-500">SOMA-AI Writing Platform. All rights reserved.</p>
           </div>
         </footer>
       </div>
