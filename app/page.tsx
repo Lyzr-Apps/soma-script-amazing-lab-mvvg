@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
@@ -823,6 +823,16 @@ function BookOutlineTab({
                     <FaDownload className="h-3 w-3" />
                     Download
                   </Button>
+                  {!showSample && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setOutlineResult(null); setExpandedChapters(new Set()) }}
+                      className="h-8 text-xs gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
@@ -887,10 +897,30 @@ function BookOutlineTab({
           {chapters.length > 0 && (
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FaListOl className="h-4 w-4 text-indigo-600" />
-                  Chapter Breakdown ({chapters.length} chapters)
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FaListOl className="h-4 w-4 text-indigo-600" />
+                    Chapter Breakdown ({chapters.length} chapters)
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-gray-500 hover:text-gray-700"
+                    onClick={() => {
+                      if (expandedChapters.size === chapters.length) {
+                        setExpandedChapters(new Set())
+                      } else {
+                        setExpandedChapters(new Set(chapters.map((_, i) => i)))
+                      }
+                    }}
+                  >
+                    {expandedChapters.size === chapters.length ? (
+                      <><FaChevronDown className="mr-1 h-2.5 w-2.5" /> Collapse All</>
+                    ) : (
+                      <><FaChevronRight className="mr-1 h-2.5 w-2.5" /> Expand All</>
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-1">
@@ -964,6 +994,7 @@ function ChapterWriterTab({
   prefillChapter,
   onSessionAdd,
   onStatsUpdate,
+  onSendToEditor,
   chapterResult,
   setChapterResult,
 }: {
@@ -973,6 +1004,7 @@ function ChapterWriterTab({
   prefillChapter: PrefillChapter | null
   onSessionAdd: (item: SessionItem) => void
   onStatsUpdate: (type: 'chapter', wordCount: number) => void
+  onSendToEditor: (text: string) => void
   chapterResult: ChapterResponse | null
   setChapterResult: (r: ChapterResponse | null) => void
 }) {
@@ -981,6 +1013,7 @@ function ChapterWriterTab({
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPrefillNotice, setShowPrefillNotice] = useState(false)
 
   // Prefill from outline-to-chapter flow
   useEffect(() => {
@@ -991,6 +1024,9 @@ function ChapterWriterTab({
         chapterNumber: prefillChapter.number,
         summary: prefillChapter.summary,
       }))
+      setShowPrefillNotice(true)
+      const timer = setTimeout(() => setShowPrefillNotice(false), 4000)
+      return () => clearTimeout(timer)
     }
   }, [prefillChapter])
 
@@ -1055,6 +1091,9 @@ function ChapterWriterTab({
           <CardDescription>Provide details about the chapter you want written and our AI co-author will draft publication-ready prose.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {showPrefillNotice && (
+            <StatusMessage type="info" message="Chapter details pre-filled from your outline. Review and adjust before writing." />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="ch-title" className="text-gray-700">Chapter Title</Label>
@@ -1174,6 +1213,25 @@ function ChapterWriterTab({
                     <FaDownload className="h-3 w-3" />
                     Download
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSendToEditor(displayData.chapter_content ?? '')}
+                    className="h-8 text-xs gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <FaEdit className="h-3 w-3" />
+                    Send to Editor
+                  </Button>
+                  {!showSample && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setChapterResult(null)}
+                      className="h-8 text-xs gap-1.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1237,6 +1295,7 @@ function ManuscriptEditorTab({
   onStatsUpdate,
   editorResult,
   setEditorResult,
+  prefillManuscript,
 }: {
   showSample: boolean
   activeAgentId: string | null
@@ -1245,11 +1304,24 @@ function ManuscriptEditorTab({
   onStatsUpdate: (type: 'edit', wordCount: number) => void
   editorResult: EditorResponse | null
   setEditorResult: (r: EditorResponse | null) => void
+  prefillManuscript: string | null
 }) {
   const [manuscript, setManuscript] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'edited' | 'original'>('edited')
+  const [originalText, setOriginalText] = useState('')
+  const [showEditorPrefillNotice, setShowEditorPrefillNotice] = useState(false)
+
+  // Prefill from chapter-to-editor flow
+  useEffect(() => {
+    if (prefillManuscript) {
+      setManuscript(prefillManuscript)
+      setShowEditorPrefillNotice(true)
+      const timer = setTimeout(() => setShowEditorPrefillNotice(false), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [prefillManuscript])
 
   const displayData = showSample ? SAMPLE_EDITOR : editorResult
 
@@ -1261,6 +1333,7 @@ function ManuscriptEditorTab({
     setLoading(true)
     setError(null)
     setEditorResult(null)
+    setOriginalText(manuscript)
     setActiveAgentId(AGENT_IDS.MANUSCRIPT_EDITOR)
     try {
       const message = `Please edit and improve the following manuscript text:\n\n${manuscript}`
@@ -1315,7 +1388,10 @@ function ManuscriptEditorTab({
           </CardTitle>
           <CardDescription>Paste your manuscript text below for professional editing, including grammar, style, clarity, and pacing improvements.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {showEditorPrefillNotice && (
+            <StatusMessage type="info" message="Chapter content loaded from the writer. Click Edit Manuscript to polish it." />
+          )}
           <Textarea
             placeholder="Paste your manuscript text here... (e.g., a chapter, a scene, or a few paragraphs you want polished)"
             value={showSample ? 'The morning light filtered through the crystalline walls of the Memory Exchange, casting prismatic shadows across the trading floor. Lena adjusted her archival gloves -- thin, translucent things that hummed faintly against her skin -- and surveyed the day\'s offerings.\n\nRows upon rows of memory capsules lined the display cases, each one glowing with a soft, inner light that spoke to the richness of the experience contained within.' : manuscript}
@@ -1394,6 +1470,16 @@ function ManuscriptEditorTab({
                     <FaDownload className="h-3 w-3" />
                     Download
                   </Button>
+                  {!showSample && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setEditorResult(null); setOriginalText('') }}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      Clear
+                    </Button>
+                  )}
                   <div className="flex items-center gap-0 bg-gray-100 rounded-lg p-0.5 ml-2">
                     <button
                       onClick={() => setViewMode('edited')}
@@ -1420,7 +1506,7 @@ function ManuscriptEditorTab({
                       )
                     : (showSample
                         ? 'The morning light filtered through the crystalline walls of the Memory Exchange, casting prismatic shadows across the trading floor. Lena adjusted her archival gloves -- thin, translucent things that hummed faintly against her skin -- and surveyed the day\'s offerings.\n\nRows upon rows of memory capsules lined the display cases, each one glowing with a soft, inner light that spoke to the richness of the experience contained within.'
-                        : manuscript
+                        : (originalText || manuscript)
                       ).split('\n').map((p, i) =>
                         !p.trim() ? <div key={i} className="h-4" /> : <p key={i} className="mb-4 text-base leading-7 text-gray-600">{p}</p>
                       )
@@ -1659,7 +1745,28 @@ function ScriptureAssistantTab({
                     </Badge>
                   )}
                 </div>
-                <CopyButton text={buildScriptureText()} label="Copy All" />
+                <div className="flex items-center gap-2">
+                  <CopyButton text={buildScriptureText()} label="Copy All" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadAsText(`${(displayData.primary_verse ?? 'scripture').replace(/[:\s]+/g, '_')}.txt`, buildScriptureText())}
+                    className="h-8 text-xs gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100"
+                  >
+                    <FaDownload className="h-3 w-3" />
+                    Download
+                  </Button>
+                  {!showSample && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setScriptureResult(null)}
+                      className="h-8 text-xs gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
               </div>
               {displayData.verse_text && (
                 <div className="relative pl-6 border-l-4 border-amber-400">
@@ -1965,10 +2072,18 @@ export default function Page() {
   const [chapterResult, setChapterResult] = useState<ChapterResponse | null>(null)
   const [editorResult, setEditorResult] = useState<EditorResponse | null>(null)
   const [scriptureResult, setScriptureResult] = useState<ScriptureResponse | null>(null)
+  const [prefillManuscript, setPrefillManuscript] = useState<string | null>(null)
 
   const handleChapterSelect = useCallback((chapter: PrefillChapter) => {
     setPrefillChapter(chapter)
     setActiveTab('writer')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  const handleSendToEditor = useCallback((text: string) => {
+    setPrefillManuscript(text)
+    setActiveTab('editor')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
   const handleSessionAdd = useCallback((item: SessionItem) => {
@@ -2116,6 +2231,7 @@ export default function Page() {
                     prefillChapter={prefillChapter}
                     onSessionAdd={handleSessionAdd}
                     onStatsUpdate={handleStatsUpdate}
+                    onSendToEditor={handleSendToEditor}
                     chapterResult={chapterResult}
                     setChapterResult={setChapterResult}
                   />
@@ -2141,6 +2257,7 @@ export default function Page() {
                     onStatsUpdate={handleStatsUpdate}
                     editorResult={editorResult}
                     setEditorResult={setEditorResult}
+                    prefillManuscript={prefillManuscript}
                   />
                 </div>
                 <div className="hidden lg:block">
@@ -2205,10 +2322,10 @@ export default function Page() {
                 <h3 className="text-white font-semibold text-sm mb-3">Quick Links</h3>
                 <ul className="space-y-2">
                   <li>
-                    <button onClick={() => setActiveTab('outline')} className="text-sm hover:text-indigo-400 transition-colors">Writing Studio</button>
+                    <button onClick={() => { setActiveTab('outline'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="text-sm hover:text-indigo-400 transition-colors">Writing Studio</button>
                   </li>
                   <li>
-                    <button onClick={() => setActiveTab('marketplace')} className="text-sm hover:text-indigo-400 transition-colors">Marketplace</button>
+                    <button onClick={() => { setActiveTab('marketplace'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="text-sm hover:text-indigo-400 transition-colors">Marketplace</button>
                   </li>
                   <li>
                     <a href="#" className="text-sm hover:text-indigo-400 transition-colors">About</a>
